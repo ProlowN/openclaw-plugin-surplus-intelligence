@@ -1,0 +1,51 @@
+{
+  "name": "surplus-intelligence",
+  "version": "1.0.0",
+  "description": "OpenClaw plugin for the Surplus Intelligence inference marketplace",
+  "main": "index.js",
+  "files": [
+    "README.md",
+    "auth.js",
+    "buyer-actions.js",
+    "commands.js",
+    "config.js",
+    "errors.js",
+    "http.js",
+    "index.js",
+    "seller-actions.js",
+    "openclaw.plugin.json",
+    "package.json",
+    "npm-shrinkwrap.json"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ],
+    "runtimeExtensions": [
+      "./index.js"
+    ],
+    "install": {
+      "clawhubSpec": "surplus-intelligence",
+      "npmSpec": "surplus-intelligence",
+      "defaultChoice": "clawhub",
+      "minHostVersion": ">=2026.6.1",
+      "allowInvalidConfigRecovery": true
+    },
+    "compat": {
+      "pluginApi": ">=2026.6.1"
+    },
+    "build": {
+      "openclawVersion": "2026.6.1"
+    },
+    "release": {
+      "publishToClawHub": true,
+      "publishToNpm": true
+    }
+  },
+  "dependencies": {
+    "ethers": "^6.16.0"
+  },
+  "overrides": {
+    "ws": "8.21.0"
+  }
+}

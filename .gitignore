@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build / pack artifacts
+*.tgz
+dist/
+build/
+out/
+
+# Environment & secrets (never commit — this repo is public)
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.keystore
+id_*
+secrets.json
+secrets.yaml
+credentials.json
+.npmrc
+clawhub-token*
+*.token
+
+# Deploy / infrastructure
+.vercel/
+.netlify/
+.serverless/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Wallet / chain artifacts
+keystore/
+wallet.json
+*.wallet
+
+# Logs & debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
