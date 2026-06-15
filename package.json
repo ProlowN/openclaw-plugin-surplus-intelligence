@@ -1,9 +1,35 @@
 {
-  "name": "surplus-intelligence",
-  "version": "1.0.0",
+  "name": "@prolown/openclaw-surplus-intelligence",
+  "version": "0.1.0-alpha.1",
   "description": "OpenClaw plugin for the Surplus Intelligence inference marketplace",
   "main": "index.js",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "ProlowN <robin334@protonmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ProlowN/openclaw-plugin-surplus-intelligence.git"
+  },
+  "homepage": "https://github.com/ProlowN/openclaw-plugin-surplus-intelligence#readme",
+  "bugs": {
+    "url": "https://github.com/ProlowN/openclaw-plugin-surplus-intelligence/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "surplus-intelligence",
+    "inference",
+    "marketplace",
+    "usdc",
+    "ethers"
+  ],
   "files": [
+    "LICENSE",
     "README.md",
     "auth.js",
     "buyer-actions.js",
@@ -25,8 +51,8 @@
       "./index.js"
     ],
     "install": {
-      "clawhubSpec": "surplus-intelligence",
-      "npmSpec": "surplus-intelligence",
+      "clawhubSpec": "@prolown/openclaw-surplus-intelligence",
+      "npmSpec": "@prolown/openclaw-surplus-intelligence",
       "defaultChoice": "clawhub",
       "minHostVersion": ">=2026.6.1",
       "allowInvalidConfigRecovery": true

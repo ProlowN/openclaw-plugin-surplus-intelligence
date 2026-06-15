@@ -1,14 +1,17 @@
 {
-  "name": "surplus-intelligence",
-  "version": "1.0.0",
+  "name": "@prolown/openclaw-surplus-intelligence",
+  "version": "0.1.0-alpha.1",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
-      "name": "surplus-intelligence",
-      "version": "1.0.0",
+      "name": "@prolown/openclaw-surplus-intelligence",
+      "version": "0.1.0-alpha.1",
       "dependencies": {
         "ethers": "^6.16.0"
+      },
+      "engines": {
+        "node": ">=18"
       }
     },
     "node_modules/@adraffy/ens-normalize": {

@@ -3,7 +3,7 @@
 Internal release guide. **Not shipped** in the published package — it is intentionally
 excluded from `package.json` `files`, so it never appears on the public ClawHub listing.
 
-This repository is the **public source of record** for the `surplus-intelligence` OpenClaw
+This repository is the **public source of record** for the `@prolown/openclaw-surplus-intelligence` OpenClaw
 plugin. The plugin lives at the repo root. Use this flow only from a clean checkout with
 Node 20 or 22.
 
@@ -15,7 +15,7 @@ Official references:
 
 ## Naming
 
-- ClawHub / install name: `surplus-intelligence` (`openclaw plugins install clawhub:surplus-intelligence`)
+- ClawHub / install name: `@prolown/openclaw-surplus-intelligence` (`openclaw plugins install clawhub:@prolown/openclaw-surplus-intelligence`)
 - Repository name follows the community convention `openclaw-plugin-<name>`.
 - The package name in `package.json`, the plugin `id`/`name` in `openclaw.plugin.json`, and
   `openclaw.install.clawhubSpec`/`npmSpec` must stay in sync.
@@ -35,13 +35,17 @@ For a release, bump the version in `package.json`, `npm-shrinkwrap.json`, and
 `openclaw.plugin.json` (keep all three in sync). If dependencies changed, refresh the
 shrinkwrap with `npm install --package-lock-only --ignore-scripts` and re-run the gates.
 
+The current version is a pre-release: `0.1.0-alpha.1`. Iterate alpha builds as
+`0.1.0-alpha.2`, `0.1.0-alpha.3`, … (publish each on the `alpha` tag — see Publish), then
+drop the suffix to cut the stable `0.1.0` on the default `latest` channel.
+
 ## Build the artifact
 
 ```bash
 npm pack --ignore-scripts
 ```
 
-This creates `surplus-intelligence-<version>.tgz`. Use that `.tgz` for the ClawHub dry-run and publish.
+This creates `prolown-openclaw-surplus-intelligence-<version>.tgz`. Use that `.tgz` for the ClawHub dry-run and publish.
 
 ## Source provenance
 
@@ -58,11 +62,17 @@ SOURCE_COMMIT=$(git rev-parse HEAD)
 
 ## Publish
 
+**This is a pre-release (`-alpha.N`).** Publish it on the `alpha` tag so it does **not** become
+the default `latest` that `openclaw plugins install` / `npm install` resolve. Both ClawHub and
+npm default to `latest`, so pass the alpha tag explicitly: ClawHub `--tags alpha` (below), and if
+you also publish to npm, `npm publish --tag alpha`. When you later cut the stable `0.1.0`, drop the
+tag so it publishes to `latest`.
+
 ```bash
 clawhub login
 clawhub whoami
-clawhub package publish ./surplus-intelligence-<version>.tgz --family code-plugin \
-  --source-repo "$SOURCE_REPO" --source-commit "$SOURCE_COMMIT" --dry-run --json
+clawhub package publish ./prolown-openclaw-surplus-intelligence-<version>.tgz --family code-plugin \
+  --tags alpha --source-repo "$SOURCE_REPO" --source-commit "$SOURCE_COMMIT" --dry-run --json
 ```
 
 If publishing under a ClawHub org owner, add `--owner <handle>` to both publish commands.
@@ -74,17 +84,17 @@ anything is wrong, fix it and rebuild the `.tgz`.
 Only after explicit release approval, publish the exact same artifact (drop `--dry-run`):
 
 ```bash
-clawhub package publish ./surplus-intelligence-<version>.tgz --family code-plugin \
-  --source-repo "$SOURCE_REPO" --source-commit "$SOURCE_COMMIT" --json
+clawhub package publish ./prolown-openclaw-surplus-intelligence-<version>.tgz --family code-plugin \
+  --tags alpha --source-repo "$SOURCE_REPO" --source-commit "$SOURCE_COMMIT" --json
 ```
 
 ## Verify
 
 ```bash
-clawhub package inspect surplus-intelligence
-clawhub package readiness surplus-intelligence
-openclaw plugins install clawhub:surplus-intelligence
-openclaw plugins inspect surplus-intelligence --runtime --json
+clawhub package inspect @prolown/openclaw-surplus-intelligence
+clawhub package readiness @prolown/openclaw-surplus-intelligence
+openclaw plugins install clawhub:@prolown/openclaw-surplus-intelligence
+openclaw plugins inspect @prolown/openclaw-surplus-intelligence --runtime --json
 ```
 
 New ClawHub releases can remain hidden from normal install and download surfaces until

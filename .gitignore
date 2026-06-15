@@ -1,27 +1,58 @@
 # Dependencies
 node_modules/
 
+# Lockfiles — npm-shrinkwrap.json is the canonical lockfile; any other would conflict
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
 # Build / pack artifacts
 *.tgz
 dist/
 build/
 out/
 
+# Test / coverage / tool caches
+coverage/
+.nyc_output/
+.eslintcache
+*.tsbuildinfo
+.cache/
+
 # Environment & secrets (never commit — this repo is public)
 .env
 .env.*
 !.env.example
+.envrc
+secrets.sh
+*env*.sh
 *.local
-*.pem
-*.key
-*.keystore
-id_*
+*.local.json
+*.private.json
+*secret*
 secrets.json
 secrets.yaml
 credentials.json
+*.pem
+*.key
+*.keystore
+*.p12
+*.pfx
+*.hex
+id_*
 .npmrc
+.npmrc.*
 clawhub-token*
 *.token
+.clawhubrc
+.clawhub/
+
+# Minted / provider API keys pasted to disk (inf_ buyer, si_seller_ seller, generic)
+inf_*
+si_seller_*
+keys.txt
+*api*key*
 
 # Deploy / infrastructure
 .vercel/
@@ -32,10 +63,22 @@ clawhub-token*
 *.tfstate.*
 *.tfvars
 
-# Wallet / chain artifacts
+# Wallet / chain artifacts (private keys, seed phrases, keystores)
 keystore/
+keystore*.json
+UTC--*
 wallet.json
 *.wallet
+mnemonic*
+*.mnemonic
+seed.txt
+seedphrase*
+*.seed
+privkey*
+
+# Process / crash dumps (can serialize in-memory keys)
+*.heapsnapshot
+core.[0-9]*
 
 # Logs & debug
 *.log
@@ -43,10 +86,31 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Local agent / assistant docs and state (not part of the published source)
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+# Un-ignore shared project settings if you ever want to track them:
+# !.claude/settings.json
+.cursor/
+.cursorrules
+.aider*
+.windsurf/
+.specstory/
+
 # OS / editor cruft
 .DS_Store
+._*
 Thumbs.db
 .idea/
 .vscode/
+*.code-workspace
 *.swp
+*.swo
+*.swn
 *~
+*.bak
+*.orig
+*.rej
+*.tmp

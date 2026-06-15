@@ -1,8 +1,15 @@
 {
-  "id": "surplus-intelligence",
+  "id": "openclaw-surplus-intelligence",
   "name": "Surplus Intelligence",
-  "version": "1.0.0",
+  "version": "0.1.0-alpha.1",
   "description": "Manage your Surplus Intelligence account: keys, balance, USDC approval, prices, savings, and seller offers. Does not route the gateway's model calls through SI — for that, configure SI as an OpenAI-compatible provider at <base>/api/inference/v1.",
+  "license": "MIT",
+  "author": "ProlowN <robin334@protonmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ProlowN/openclaw-plugin-surplus-intelligence.git"
+  },
+  "homepage": "https://github.com/ProlowN/openclaw-plugin-surplus-intelligence#readme",
   "entryPoint": "./index.js",
   "setupHints": [
     "Set INFERENCE_API_URL to the Surplus Intelligence API host you intend to use (https required, http only for localhost).",
