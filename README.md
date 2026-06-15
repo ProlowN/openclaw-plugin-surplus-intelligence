@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://www.surplusintelligence.ai/surplus-logo.png" alt="Surplus Intelligence" width="180" />
+  <img src="https://raw.githubusercontent.com/ProlowN/openclaw-plugin-surplus-intelligence/main/assets/surplus-logo.png" alt="Surplus Intelligence" width="180" />
 </p>
 
 # Surplus Intelligence
