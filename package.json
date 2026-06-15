@@ -1,6 +1,6 @@
 {
   "name": "@prolown/openclaw-surplus-intelligence",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "OpenClaw plugin for the Surplus Intelligence inference marketplace",
   "main": "index.js",
   "license": "MIT",

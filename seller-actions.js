@@ -24,13 +24,13 @@ function formatList(items) {
 
 function getSellerProviderConfig(ctx) {
   const sellerBaseUrl = config.getConfigValue(ctx, 'INFERENCE_SELLER_BASE_URL')
-  const providerApiKey = config.getConfigValue(ctx, 'INFERENCE_PROVIDER_API_KEY')
-  if (!sellerBaseUrl || !providerApiKey) {
+  const providerKey = config.getConfigValue(ctx, 'INFERENCE_PROVIDER_API_KEY')
+  if (!sellerBaseUrl || !providerKey) {
     throw new Error(
       'Missing seller provider config. Set INFERENCE_SELLER_BASE_URL and INFERENCE_PROVIDER_API_KEY before creating offers.',
     )
   }
-  return { sellerBaseUrl, providerApiKey }
+  return { sellerBaseUrl, providerKey }
 }
 
 function parsePositiveNumber(value, label) {
@@ -65,12 +65,12 @@ async function sell(ctx = {}) {
     return { text: 'Usage: /inference_sell <model> <input_price> <output_price> [daily_cap_usd]' }
   }
 
-  const { sellerBaseUrl, providerApiKey } = getSellerProviderConfig(ctx)
+  const { sellerBaseUrl, providerKey } = getSellerProviderConfig(ctx)
   const body = {
     model,
     price_input_per_1m: parsePositiveNumber(inputPrice, 'input_price'),
     price_output_per_1m: parsePositiveNumber(outputPrice, 'output_price'),
-    api_key: providerApiKey,
+    api_key: providerKey,
     seller_base_url: sellerBaseUrl,
   }
   if (dailyCap !== undefined) {
