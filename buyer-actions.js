@@ -1,6 +1,12 @@
 const config = require('./config')
 const { fetchJson, buyerFetchJson } = require('./http')
-const { hasWalletPrivateKey, mintBuyerKey, signBuyerAuthChallenge, signTypedData } = require('./auth')
+
+// The dashboard (/buy) lives on the same host as the API, so derive it from the
+// configured base rather than hardcoding prod — a custom/localhost
+// INFERENCE_API_URL should link to its own dashboard.
+function dashboardUrl(ctx) {
+  return `${config.getApiBase(ctx)}/buy`
+}
 
 function formatPrice(n) {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return 'N/A'
@@ -73,21 +79,32 @@ async function models(ctx = {}) {
   return { text: formatList(rows) }
 }
 
+// Prints how to use the SI key as an OpenAI-compatible provider in any client.
+// This is how inference is actually bought — the plugin itself is the dashboard,
+// not an inference client. Composes the base URL from config; never echoes the key.
+async function provider(ctx = {}) {
+  const base = config.getApiBase(ctx)
+  const lines = [
+    'Use Surplus Intelligence as an OpenAI-compatible provider in your client (opencode, OpenClaw, Cursor, etc.):',
+    '',
+    `  Base URL:  ${base}/api/inference/v1`,
+    '  API key:   your inf_ key (the same value you set as INFERENCE_BUYER_API_KEY)',
+    '  Models:    run /inference_models for ids (e.g. anthropic/claude-opus-4.6)',
+    '',
+    'Every model call your client makes is then bought on Surplus Intelligence and settled in USDC',
+    'from the allowance you approved in the dashboard. Check you are funded and approved with',
+    '/inference_balance before you start.',
+  ]
+  return { text: lines.join('\n') }
+}
+
 const KEY_VISIBILITY_NOTE = 'This key is now part of the conversation context and may be logged; revoke it if this chat is shared.'
 
+// Issues an additional key through the API using the configured key (POST
+// /buyers/keys is authorized by the existing Bearer key — no wallet involved).
+// USDC allowance is per-wallet, so a new key inherits your wallet's funding and
+// approval and can spend immediately. The first/primary key is created in the dashboard.
 async function createKey(ctx = {}) {
-  if (!config.getConfigValue(ctx, 'INFERENCE_BUYER_API_KEY')) {
-    if (!hasWalletPrivateKey(ctx)) {
-      return {
-        text: 'Cannot create a key: set INFERENCE_BUYER_API_KEY, or set CLAWDBOT_WALLET_PRIVATE_KEY so /inference_key can mint a wallet-backed key.',
-      }
-    }
-    const { apiKey } = await mintBuyerKey(ctx)
-    return {
-      text: `Buyer API key: ${apiKey}\nSave this key - it will not be shown again. Set INFERENCE_BUYER_API_KEY to reuse it after restart.\n${KEY_VISIBILITY_NOTE}`,
-    }
-  }
-
   const data = await buyerFetchJson(config.BUYER_KEYS, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -99,20 +116,9 @@ async function createKey(ctx = {}) {
 }
 
 async function listKeys(ctx = {}) {
-  if (hasWalletPrivateKey(ctx)) {
-    const { message, signature } = await signBuyerAuthChallenge(ctx)
-    const query = new URLSearchParams({ message, signature }).toString()
-    const data = await fetchJson(`${config.BUYER_AUTH_KEYS}?${query}`, {}, ctx)
-    const keys = data?.keys || data || []
-    return { text: formatList(formatKeyRows(keys)) }
-  }
-
   const data = await buyerFetchJson(config.BUYER_KEYS, {}, ctx)
   const keys = data?.keys || data || []
-  const rows = formatKeyRows(keys)
-  const legacyNote = 'Unified buyer key listing requires CLAWDBOT_WALLET_PRIVATE_KEY for a fresh wallet signature.'
-  if (!rows.length) return { text: `No legacy buyer keys. ${legacyNote}` }
-  return { text: `${formatList(rows)}\n${legacyNote}` }
+  return { text: formatList(formatKeyRows(keys)) }
 }
 
 async function balance(ctx = {}) {
@@ -127,9 +133,10 @@ async function balance(ctx = {}) {
   ]
   let text = formatList(lines)
   // The router requires a >=$1.00 USDC allowance to the settlement contract
-  // before any request can be routed; surface the next step when it is short.
+  // before any request your client sends can be routed; surface the next step
+  // when it is short.
   if (!(allowance >= 1)) {
-    text += '\n\nApproval is below the $1.00 floor required to buy inference. Run /inference_approve <amount_usdc> for a gasless approval, or /inference_approve_status for details.'
+    text += `\n\nApproval is below the $1.00 floor required to buy inference. Approve USDC to the settlement contract from the dashboard (${dashboardUrl(ctx)}); see /inference_approve_status for details.`
   }
   return { text }
 }
@@ -155,80 +162,19 @@ async function approveStatus(ctx = {}) {
     `Settlement contract: ${data?.settlement_contract || 'unknown'}`,
   ]
   let text = formatList(lines)
+  // Approving USDC requires an on-chain transaction (or a gasless permit signed
+  // by the owning wallet), which the plugin no longer does — point at the
+  // dashboard, which handles both EOAs and smart-contract wallets.
   if (!(allowance >= 1)) {
-    text += data?.is_contract
-      ? '\n\nThis is a smart-contract wallet, so gasless permit approval is not available. Approve USDC to the settlement contract from the web dashboard.'
-      : '\n\nApproval is below the $1.00 floor. Run /inference_approve <amount_usdc> for a gasless approval.'
+    text += `\n\nApproval is below the $1.00 floor required to buy inference. Approve USDC to the settlement contract from the dashboard (${dashboardUrl(ctx)}).`
   }
   return { text }
-}
-
-async function approve(ctx = {}) {
-  const [amountArg] = parseArgs(ctx.args)
-  if (!amountArg) return { text: 'Usage: /inference_approve <amount_usdc>  (e.g. /inference_approve 25)' }
-  const amount = Number(amountArg)
-  if (!Number.isFinite(amount) || amount <= 0) return { text: 'amount_usdc must be a positive number.' }
-
-  // approve-status is the server's source of truth for the spender, USDC token,
-  // EIP-2612 permit domain + nonce, and whether the wallet is a smart contract
-  // (permit is ecrecover-based, so contract wallets must use the dashboard).
-  const status = await buyerFetchJson(config.BUYER_APPROVE_STATUS, {}, ctx)
-  if (status?.is_contract) {
-    return { text: 'This is a smart-contract wallet — gasless permit is not supported. Approve USDC from the web dashboard instead.' }
-  }
-  const spender = status?.settlement_contract
-  const usdc = status?.usdc_contract
-  const domainMeta = status?.permit_domain
-  const nonce = status?.permit_nonce
-  if (!spender || !usdc || !domainMeta || nonce === undefined || nonce === null) {
-    return { text: 'Approval status response was incomplete; cannot build the permit. Try /inference_approve_status.' }
-  }
-
-  const value = BigInt(Math.round(amount * 10 ** config.USDC_DECIMALS))
-  // A 0-value permit is a valid allowance *revoke* server-side, so refuse an
-  // amount that rounds down to 0 base units rather than silently wiping it.
-  if (value === 0n) {
-    return { text: 'amount_usdc is too small to approve (rounds to 0 USDC base units). Approve at least 0.000001 USDC.' }
-  }
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600)
-  const domain = { name: domainMeta.name, version: domainMeta.version, chainId: config.CHAIN_ID, verifyingContract: usdc }
-  const types = {
-    Permit: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' },
-      { name: 'value', type: 'uint256' },
-      { name: 'nonce', type: 'uint256' },
-      { name: 'deadline', type: 'uint256' },
-    ],
-  }
-  const message = { owner: status.wallet, spender, value, nonce: BigInt(nonce), deadline }
-
-  const { signature, wallet: signer } = await signTypedData(ctx, domain, types, message)
-  if (String(signer).toLowerCase() !== String(status.wallet).toLowerCase()) {
-    return { text: `Cannot approve: CLAWDBOT_WALLET_PRIVATE_KEY (${signer}) is not the wallet that owns this buyer key (${status.wallet}). They must match to sign the permit.` }
-  }
-
-  const result = await buyerFetchJson(config.BUYER_APPROVE_PERMIT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signature, value: value.toString(), deadline: deadline.toString() }),
-  }, ctx)
-  const tx = result?.tx_hash ? ` (tx ${result.tx_hash})` : ''
-  return { text: `Approved ${formatNumber(amount, 2)} USDC to the settlement contract${tx}. You can now buy inference.` }
 }
 
 async function revokeKey(ctx = {}) {
   const [keyId] = parseArgs(ctx.args)
   if (!keyId) return { text: 'Usage: /inference_key_revoke <key_id>  (find IDs with /inference_keys)' }
-  if (!hasWalletPrivateKey(ctx)) {
-    return { text: 'Revoking a key requires a fresh wallet signature. Set CLAWDBOT_WALLET_PRIVATE_KEY.' }
-  }
-  const { message, signature } = await signBuyerAuthChallenge(ctx)
-  await fetchJson(`${config.BUYER_AUTH_KEY}/${encodeURIComponent(keyId)}`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, signature }),
-  }, ctx)
+  await buyerFetchJson(`${config.BUYER_KEYS}/${encodeURIComponent(keyId)}`, { method: 'DELETE' }, ctx)
   return { text: `Revoked key ${keyId}.` }
 }
 
@@ -250,8 +196,16 @@ function registerBuyerCommands(api) {
   })
 
   api.registerCommand({
+    name: 'inference_provider',
+    description: 'Show how to use your key as an OpenAI-compatible provider',
+    acceptsArgs: false,
+    requireAuth: true,
+    handler: provider,
+  })
+
+  api.registerCommand({
     name: 'inference_key',
-    description: 'Create a new buyer API key',
+    description: 'Create another API key',
     acceptsArgs: false,
     requireAuth: true,
     handler: createKey,
@@ -259,7 +213,7 @@ function registerBuyerCommands(api) {
 
   api.registerCommand({
     name: 'inference_keys',
-    description: 'List buyer API keys',
+    description: 'List your API keys',
     acceptsArgs: false,
     requireAuth: true,
     handler: listKeys,
@@ -267,7 +221,7 @@ function registerBuyerCommands(api) {
 
   api.registerCommand({
     name: 'inference_balance',
-    description: 'Show buyer balance and stats',
+    description: 'Show your balance, USDC allowance, and usage',
     acceptsArgs: false,
     requireAuth: true,
     handler: balance,
@@ -275,7 +229,7 @@ function registerBuyerCommands(api) {
 
   api.registerCommand({
     name: 'inference_savings',
-    description: 'Show buyer savings stats',
+    description: 'Show how much you have saved vs direct pricing',
     acceptsArgs: false,
     requireAuth: true,
     handler: savings,
@@ -283,23 +237,15 @@ function registerBuyerCommands(api) {
 
   api.registerCommand({
     name: 'inference_approve_status',
-    description: 'Show USDC balance, allowance, and settlement contract',
+    description: 'Show funding status: USDC balance, allowance, and settlement contract',
     acceptsArgs: false,
     requireAuth: true,
     handler: approveStatus,
   })
 
   api.registerCommand({
-    name: 'inference_approve',
-    description: 'Gasless USDC approval to the settlement contract (EIP-2612 permit)',
-    acceptsArgs: true,
-    requireAuth: true,
-    handler: approve,
-  })
-
-  api.registerCommand({
     name: 'inference_key_revoke',
-    description: 'Revoke a buyer API key (requires wallet signature)',
+    description: 'Revoke an API key',
     acceptsArgs: true,
     requireAuth: true,
     handler: revokeKey,
@@ -309,12 +255,12 @@ function registerBuyerCommands(api) {
 module.exports = {
   prices,
   models,
+  provider,
   createKey,
   listKeys,
   balance,
   savings,
   approveStatus,
-  approve,
   revokeKey,
   registerBuyerCommands,
 }

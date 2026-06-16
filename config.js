@@ -36,24 +36,12 @@ function getApiBase(ctx = {}) {
 module.exports = {
   DEFAULT_API_BASE,
   getApiBase,
-  // Base mainnet — the whole marketplace settles on chainId 8453.
-  CHAIN_ID: 8453,
-  USDC_DECIMALS: 6,
   // endpoints
   MARKETS: '/api/inference/markets',
   MODELS: '/api/inference/v1/models',
-  BUYER_AUTH_CHALLENGE: '/api/inference/buyers/auth/challenge',
-  BUYER_AUTH_KEY: '/api/inference/buyers/auth/key',
-  BUYER_AUTH_KEYS: '/api/inference/buyers/auth/keys',
-  SELLER_AUTH_CHALLENGE: '/api/inference/sellers/auth/challenge',
-  SELLER_AUTH_KEY: '/api/inference/sellers/auth/key',
   BUYER_KEYS: '/api/inference/buyers/keys',
   BUYER_ME: '/api/inference/buyers/me',
   BUYER_SAVINGS: '/api/inference/buyers/savings',
   BUYER_APPROVE_STATUS: '/api/inference/buyers/approve-status',
-  BUYER_APPROVE_PERMIT: '/api/inference/buyers/approve-permit',
-  SELLER_OFFERS: '/api/inference/sellers/offers',
-  SELLER_HEALTH: '/api/inference/sellers/health-log',
-  SELLER_EARNINGS: '/api/inference/sellers/earnings',
   getConfigValue,
 }

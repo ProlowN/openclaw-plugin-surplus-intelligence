@@ -1,8 +1,8 @@
 {
   "id": "openclaw-surplus-intelligence",
   "name": "Surplus Intelligence",
-  "version": "0.1.1",
-  "description": "Manage your Surplus Intelligence account: keys, balance, USDC approval, prices, savings, and seller offers. Does not route the gateway's model calls through SI — for that, configure SI as an OpenAI-compatible provider at <base>/api/inference/v1.",
+  "version": "0.2.0-alpha.1",
+  "description": "A from-chat usage dashboard for your Surplus Intelligence inference account: prices, models, your API key, USDC balance/allowance, and savings (no wallet needed). You buy inference by using your key as an OpenAI-compatible provider at <base>/api/inference/v1 in your own client — this plugin is the dashboard around that, not an inference client. Run /inference_provider for the setup. Seller commands are not yet implemented.",
   "license": "MIT",
   "author": "ProlowN <robin334@protonmail.com>",
   "repository": {
@@ -12,10 +12,12 @@
   "homepage": "https://github.com/ProlowN/openclaw-plugin-surplus-intelligence#readme",
   "entryPoint": "./index.js",
   "setupHints": [
-    "Set INFERENCE_API_URL to the Surplus Intelligence API host you intend to use (https required, http only for localhost).",
-    "Market browsing (/inference_prices, /inference_models) needs no credentials. Account commands (/inference_balance, /inference_savings) require INFERENCE_BUYER_API_KEY; without one, run /inference_key once to mint a key with CLAWDBOT_WALLET_PRIVATE_KEY.",
-    "/inference_approve additionally requires CLAWDBOT_WALLET_PRIVATE_KEY, and that wallet must own the buyer key (it signs the gasless EIP-2612 permit).",
-    "Seller commands require INFERENCE_SELLER_API_KEY; without one, run /inference_seller_key to mint a key with CLAWDBOT_WALLET_PRIVATE_KEY. Creating offers also requires INFERENCE_SELLER_BASE_URL and INFERENCE_PROVIDER_API_KEY."
+    "Set INFERENCE_API_URL to the Surplus Intelligence API host you intend to use (https required, http only for localhost). Defaults to https://www.surplusintelligence.ai.",
+    "Browsing the market (/inference_prices, /inference_models) needs no credentials.",
+    "Create an inf_ key in the dashboard (https://www.surplusintelligence.ai/buy), add USDC to your wallet, and approve spend there. Set the key as INFERENCE_BUYER_API_KEY so the dashboard commands can read your account.",
+    "To actually buy inference, use that key as an OpenAI-compatible provider at <INFERENCE_API_URL>/api/inference/v1 in your client (opencode, OpenClaw, Cursor, etc.) — run /inference_provider for the exact setup. This plugin does not send inference itself.",
+    "Account/usage commands (/inference_balance, /inference_savings, /inference_keys, /inference_key, /inference_key_revoke, /inference_approve_status, /inference_provider) require INFERENCE_BUYER_API_KEY.",
+    "Seller commands are not yet implemented — the dashboard cannot issue a seller API key yet."
   ],
   "configSchema": {
     "type": "object",
@@ -30,29 +32,7 @@
       "INFERENCE_BUYER_API_KEY": {
         "type": "string",
         "pattern": "^inf_",
-        "description": "Pre-provisioned buyer API key for buyer commands.",
-        "sensitive": true
-      },
-      "INFERENCE_SELLER_API_KEY": {
-        "type": "string",
-        "pattern": "^si_seller_",
-        "description": "Pre-provisioned seller API key for seller commands.",
-        "sensitive": true
-      },
-      "INFERENCE_SELLER_BASE_URL": {
-        "type": "string",
-        "format": "uri",
-        "description": "Provider base URL used when creating seller offers."
-      },
-      "INFERENCE_PROVIDER_API_KEY": {
-        "type": "string",
-        "description": "Provider API key sent only to the Surplus Intelligence seller offer endpoint.",
-        "sensitive": true
-      },
-      "CLAWDBOT_WALLET_PRIVATE_KEY": {
-        "type": "string",
-        "pattern": "^(0x)?[0-9a-fA-F]{64}$",
-        "description": "Wallet private key used only to sign SIWE auth challenges (buyer/seller key minting, key listing, key revoke) and the gasless USDC approval permit. Use a dedicated wallet; never a server or operator key.",
+        "description": "Your Surplus Intelligence API key (inf_…) created in the dashboard. One key, two uses: the provider key your client sends to buy inference, and what this plugin reads your account/usage with.",
         "sensitive": true
       }
     }

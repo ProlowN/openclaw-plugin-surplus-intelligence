@@ -1,7 +1,7 @@
 {
   "name": "@prolown/openclaw-surplus-intelligence",
-  "version": "0.1.1",
-  "description": "OpenClaw plugin for the Surplus Intelligence inference marketplace",
+  "version": "0.2.0-alpha.1",
+  "description": "OpenClaw plugin: a from-chat usage dashboard for your Surplus Intelligence inference account",
   "main": "index.js",
   "license": "MIT",
   "engines": {
@@ -25,8 +25,7 @@
     "surplus-intelligence",
     "inference",
     "marketplace",
-    "usdc",
-    "ethers"
+    "usdc"
   ],
   "files": [
     "LICENSE",
@@ -68,10 +67,5 @@
       "publishToNpm": true
     }
   },
-  "dependencies": {
-    "ethers": "^6.16.0"
-  },
-  "overrides": {
-    "ws": "8.21.0"
-  }
+  "dependencies": {}
 }

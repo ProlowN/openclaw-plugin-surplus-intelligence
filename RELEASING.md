@@ -35,9 +35,10 @@ For a release, bump the version in `package.json`, `npm-shrinkwrap.json`, and
 `openclaw.plugin.json` (keep all three in sync). If dependencies changed, refresh the
 shrinkwrap with `npm install --package-lock-only --ignore-scripts` and re-run the gates.
 
-The current version is a pre-release: `0.1.0-alpha.1`. Iterate alpha builds as
-`0.1.0-alpha.2`, `0.1.0-alpha.3`, … (publish each on the `alpha` tag — see Publish), then
-drop the suffix to cut the stable `0.1.0` on the default `latest` channel.
+The stable `0.1.1` is published on `latest`. The current working version is a pre-release:
+`0.2.0-alpha.1` (a breaking refactor: wallet flow removed, seller not implemented). Iterate
+alpha builds as `0.2.0-alpha.2`, `0.2.0-alpha.3`, … (publish each on the `alpha` tag — see
+Publish), then drop the suffix to cut the stable `0.2.0` on the default `latest` channel.
 
 ## Build the artifact
 
@@ -65,7 +66,7 @@ SOURCE_COMMIT=$(git rev-parse HEAD)
 **This is a pre-release (`-alpha.N`).** Publish it on the `alpha` tag so it does **not** become
 the default `latest` that `openclaw plugins install` / `npm install` resolve. Both ClawHub and
 npm default to `latest`, so pass the alpha tag explicitly: ClawHub `--tags alpha` (below), and if
-you also publish to npm, `npm publish --tag alpha`. When you later cut the stable `0.1.0`, drop the
+you also publish to npm, `npm publish --tag alpha`. When you later cut the stable `0.2.0`, drop the
 tag so it publishes to `latest`.
 
 ```bash
