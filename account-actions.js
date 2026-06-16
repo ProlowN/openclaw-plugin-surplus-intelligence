@@ -1,5 +1,5 @@
 const config = require('./config')
-const { fetchJson, buyerFetchJson } = require('./http')
+const { fetchJson, accountFetchJson } = require('./http')
 
 // The dashboard (/buy) lives on the same host as the API, so derive it from the
 // configured base rather than hardcoding prod — a custom/localhost
@@ -88,7 +88,7 @@ async function provider(ctx = {}) {
     'Use Surplus Intelligence as an OpenAI-compatible provider in your client (opencode, OpenClaw, Cursor, etc.):',
     '',
     `  Base URL:  ${base}/api/inference/v1`,
-    '  API key:   your inf_ key (the same value you set as INFERENCE_BUYER_API_KEY)',
+    '  API key:   your inf_ key (the same value you set as INFERENCE_API_KEY)',
     '  Models:    run /inference_models for ids (e.g. anthropic/claude-opus-4.6)',
     '',
     'Every model call your client makes is then bought on Surplus Intelligence and settled in USDC',
@@ -105,7 +105,7 @@ const KEY_VISIBILITY_NOTE = 'This key is now part of the conversation context an
 // USDC allowance is per-wallet, so a new key inherits your wallet's funding and
 // approval and can spend immediately. The first/primary key is created in the dashboard.
 async function createKey(ctx = {}) {
-  const data = await buyerFetchJson(config.BUYER_KEYS, {
+  const data = await accountFetchJson(config.BUYER_KEYS, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ label: 'openclaw-plugin' }),
@@ -116,13 +116,13 @@ async function createKey(ctx = {}) {
 }
 
 async function listKeys(ctx = {}) {
-  const data = await buyerFetchJson(config.BUYER_KEYS, {}, ctx)
+  const data = await accountFetchJson(config.BUYER_KEYS, {}, ctx)
   const keys = data?.keys || data || []
   return { text: formatList(formatKeyRows(keys)) }
 }
 
 async function balance(ctx = {}) {
-  const data = await buyerFetchJson(config.BUYER_ME, {}, ctx)
+  const data = await accountFetchJson(config.BUYER_ME, {}, ctx)
   const allowance = Number(data?.usdc_allowance ?? data?.usdc_approval ?? 0)
   const lines = [
     `USDC balance: ${formatNumber(data?.usdc_balance ?? data?.balance_usdc ?? data?.balance ?? 0, 2)}`,
@@ -142,7 +142,7 @@ async function balance(ctx = {}) {
 }
 
 async function savings(ctx = {}) {
-  const data = await buyerFetchJson(config.BUYER_SAVINGS, {}, ctx)
+  const data = await accountFetchJson(config.BUYER_SAVINGS, {}, ctx)
   const lines = [
     `Total saved: ${formatNumber(data?.total_saved_usd ?? data?.total_saved_usdc ?? data?.total_saved ?? 0, 2)}`,
     `Savings rate: ${formatNumber(data?.savings_pct ?? data?.savings_percent ?? 0, 2)}%`,
@@ -152,7 +152,7 @@ async function savings(ctx = {}) {
 }
 
 async function approveStatus(ctx = {}) {
-  const data = await buyerFetchJson(config.BUYER_APPROVE_STATUS, {}, ctx)
+  const data = await accountFetchJson(config.BUYER_APPROVE_STATUS, {}, ctx)
   const allowance = Number(data?.usdc_allowance ?? 0)
   const lines = [
     `Wallet: ${data?.wallet || 'unknown'}`,
@@ -174,11 +174,11 @@ async function approveStatus(ctx = {}) {
 async function revokeKey(ctx = {}) {
   const [keyId] = parseArgs(ctx.args)
   if (!keyId) return { text: 'Usage: /inference_key_revoke <key_id>  (find IDs with /inference_keys)' }
-  await buyerFetchJson(`${config.BUYER_KEYS}/${encodeURIComponent(keyId)}`, { method: 'DELETE' }, ctx)
+  await accountFetchJson(`${config.BUYER_KEYS}/${encodeURIComponent(keyId)}`, { method: 'DELETE' }, ctx)
   return { text: `Revoked key ${keyId}.` }
 }
 
-function registerBuyerCommands(api) {
+function registerAccountCommands(api) {
   api.registerCommand({
     name: 'inference_prices',
     description: 'Check current inference prices',
@@ -262,5 +262,5 @@ module.exports = {
   savings,
   approveStatus,
   revokeKey,
-  registerBuyerCommands,
+  registerAccountCommands,
 }

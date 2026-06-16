@@ -25,7 +25,7 @@ Official references:
 ```bash
 node --version
 npm audit --omit=dev --audit-level=moderate
-node --check auth.js && node --check buyer-actions.js && node --check commands.js && node --check config.js && node --check errors.js && node --check http.js && node --check index.js && node --check seller-actions.js
+node --check account-actions.js && node --check auth.js && node --check commands.js && node --check config.js && node --check errors.js && node --check http.js && node --check index.js && node --check seller-actions.js
 npm pack --dry-run --json --ignore-scripts
 npx --yes @openclaw/plugin-inspector inspect --no-openclaw --out /tmp/si-plugin-inspector --json
 git diff --check

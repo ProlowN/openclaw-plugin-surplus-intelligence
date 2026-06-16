@@ -14,9 +14,9 @@
   "setupHints": [
     "Set INFERENCE_API_URL to the Surplus Intelligence API host you intend to use (https required, http only for localhost). Defaults to https://www.surplusintelligence.ai.",
     "Browsing the market (/inference_prices, /inference_models) needs no credentials.",
-    "Create an inf_ key in the dashboard (https://www.surplusintelligence.ai/buy), add USDC to your wallet, and approve spend there. Set the key as INFERENCE_BUYER_API_KEY so the dashboard commands can read your account.",
+    "Create an inf_ key in the dashboard (https://www.surplusintelligence.ai/buy), add USDC to your wallet, and approve spend there. Set the key as INFERENCE_API_KEY so the dashboard commands can read your account.",
     "To actually buy inference, use that key as an OpenAI-compatible provider at <INFERENCE_API_URL>/api/inference/v1 in your client (opencode, OpenClaw, Cursor, etc.) — run /inference_provider for the exact setup. This plugin does not send inference itself.",
-    "Account/usage commands (/inference_balance, /inference_savings, /inference_keys, /inference_key, /inference_key_revoke, /inference_approve_status, /inference_provider) require INFERENCE_BUYER_API_KEY.",
+    "Account/usage commands (/inference_balance, /inference_savings, /inference_keys, /inference_key, /inference_key_revoke, /inference_approve_status, /inference_provider) require INFERENCE_API_KEY.",
     "Seller commands are not yet implemented — the dashboard cannot issue a seller API key yet."
   ],
   "configSchema": {
@@ -29,10 +29,10 @@
         "default": "https://www.surplusintelligence.ai",
         "description": "Surplus Intelligence API base URL."
       },
-      "INFERENCE_BUYER_API_KEY": {
+      "INFERENCE_API_KEY": {
         "type": "string",
         "pattern": "^inf_",
-        "description": "Your Surplus Intelligence API key (inf_…) created in the dashboard. One key, two uses: the provider key your client sends to buy inference, and what this plugin reads your account/usage with.",
+        "description": "Your Surplus Intelligence API key (inf_…) created in the dashboard (SI labels it a \"buyer key\"). One key, two uses: the provider key your client sends to buy inference, and what this plugin reads your account/usage with.",
         "sensitive": true
       }
     }

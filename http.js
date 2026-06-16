@@ -1,5 +1,5 @@
 const config = require('./config')
-const { getBuyerAuth } = require('./auth')
+const { getAccountAuth } = require('./auth')
 const { errorDetailFromResponse } = require('./errors')
 
 function toUrl(pathOrUrl, ctx = {}) {
@@ -24,8 +24,8 @@ async function fetchJson(pathOrUrl, options = {}, ctx = {}) {
   return parseJson(resp)
 }
 
-async function buyerFetchJson(path, options = {}, ctx = {}) {
-  const { apiKey } = await getBuyerAuth(ctx)
+async function accountFetchJson(path, options = {}, ctx = {}) {
+  const { apiKey } = await getAccountAuth(ctx)
   const headers = {
     ...(options.headers || {}),
     Authorization: `Bearer ${apiKey}`,
@@ -35,5 +35,5 @@ async function buyerFetchJson(path, options = {}, ctx = {}) {
 
 module.exports = {
   fetchJson,
-  buyerFetchJson,
+  accountFetchJson,
 }

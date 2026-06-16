@@ -9,7 +9,7 @@
 [![npm version](https://img.shields.io/npm/v/@prolown/openclaw-surplus-intelligence)](https://www.npmjs.com/package/@prolown/openclaw-surplus-intelligence)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-> **Alpha.** Uses a buyer API key (no wallet). **Seller commands are not yet implemented** — see [Seller](#seller-not-yet-implemented).
+> **Alpha.** Uses an API key (no wallet). **Seller commands are not yet implemented** — see [Seller](#seller-not-yet-implemented).
 
 ## What this plugin is
 
@@ -37,7 +37,7 @@ This plugin is the dashboard around steps 1–3 — it doesn't route the gateway
 
 This plugin reads your SI account with your API key and can surface keys into the chat — read this first:
 
-- **The key is a secret.** Configure `INFERENCE_BUYER_API_KEY` as a sensitive value; anyone with it can read your account and spend your approved USDC. It's the same key your client uses as a provider.
+- **The key is a secret.** Configure `INFERENCE_API_KEY` as a sensitive value; anyone with it can read your account and spend your approved USDC. It's the same key your client uses as a provider.
 - **Created keys are shown once and become part of the chat transcript.** `/inference_key` returns a new key inline — treat the transcript as sensitive and revoke a key if the chat is shared.
 - The plugin never logs the key, and never echoes it (e.g. `/inference_provider` tells you to use your key, it does not print it). Funding and approving USDC happen in the web dashboard, so no wallet private key ever touches the plugin.
 
@@ -64,7 +64,7 @@ openclaw plugins install npm:@prolown/openclaw-surplus-intelligence
 
    ```bash
    export INFERENCE_API_URL=https://www.surplusintelligence.ai
-   export INFERENCE_BUYER_API_KEY=inf_...
+   export INFERENCE_API_KEY=inf_...
    ```
 4. Run `/inference_provider` for the provider config, and `/inference_balance` to confirm you're funded and approved. See **[Setup](#setup)** for the full flow.
 
@@ -115,7 +115,7 @@ The dashboard commands read your account with a key you create once in the web d
 
    ```bash
    export INFERENCE_API_URL=https://www.surplusintelligence.ai
-   export INFERENCE_BUYER_API_KEY=inf_...
+   export INFERENCE_API_KEY=inf_...
    ```
 
 With the key set, the plugin authenticates the account/usage commands by sending it as a Bearer token:
@@ -136,7 +136,7 @@ There is currently no way to obtain a seller API key through the Surplus Intelli
 | Name | Purpose | Sensitive |
 | --- | --- | --- |
 | `INFERENCE_API_URL` | Surplus Intelligence API base URL. Defaults to `https://www.surplusintelligence.ai`. Must be https; http is allowed only for localhost. | no |
-| `INFERENCE_BUYER_API_KEY` | Your SI API key (`inf_…`) from the dashboard. The same key your client uses as a provider; the plugin reads your account/usage with it. | yes |
+| `INFERENCE_API_KEY` | Your SI API key (`inf_…`) from the dashboard (SI labels it a "buyer key"). The same key your client uses as a provider; the plugin reads your account/usage with it. | yes |
 
 Values set in the plugin config take precedence over environment variables of the same name.
 

@@ -30,8 +30,8 @@
   "files": [
     "LICENSE",
     "README.md",
+    "account-actions.js",
     "auth.js",
-    "buyer-actions.js",
     "commands.js",
     "config.js",
     "errors.js",

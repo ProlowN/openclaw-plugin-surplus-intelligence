@@ -1,4 +1,4 @@
 module.exports = {
-  ...require('./buyer-actions'),
+  ...require('./account-actions'),
   ...require('./seller-actions'),
 }
