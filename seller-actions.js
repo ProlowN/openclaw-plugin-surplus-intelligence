@@ -1,43 +1,266 @@
-// Seller support is not yet implemented.
-//
-// Selling requires a seller API key (si_seller_*), and the Surplus Intelligence
-// web dashboard does not currently expose a way to create one — the only path
-// is a wallet-signature (SIWE) flow, which this plugin deliberately no longer
-// performs. The intended model, once the dashboard can issue seller keys, is:
-// a seller key + one or more provider (inference) API keys + a payout address.
-// Until then these commands are registered for discoverability but return a
-// not-implemented notice rather than calling the API.
-const SELLER_NOT_IMPLEMENTED =
-  'Seller support is not yet implemented. The Surplus Intelligence dashboard cannot issue a seller API key yet, so the plugin cannot act as a seller. Once seller keys are available, this will let you manage offers, pricing, health, and earnings from chat.'
+const config = require('./config')
+const { sellerFetchJson } = require('./http')
+const { mintSellerKey } = require('./auth')
+const { resolveProvider, providerIds } = require('./providers')
 
-async function notImplemented() {
-  return { text: SELLER_NOT_IMPLEMENTED }
+function formatPrice(n) {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return 'N/A'
+  const num = Number(n)
+  return `$${num.toFixed(2)}/1M tokens`
 }
 
-function registerSellerCommands(api) {
-  const sellerCommands = [
-    { name: 'inference_offers', description: 'List your seller offers (not yet implemented)', acceptsArgs: false },
-    { name: 'inference_sell', description: 'Create a seller offer (not yet implemented)', acceptsArgs: true },
-    { name: 'inference_price', description: 'Update offer pricing (not yet implemented)', acceptsArgs: true },
-    { name: 'inference_cancel', description: 'Cancel a seller offer (not yet implemented)', acceptsArgs: true },
-    { name: 'inference_health', description: 'Show recent health events (not yet implemented)', acceptsArgs: false },
-    { name: 'inference_earnings', description: 'Show seller earnings (not yet implemented)', acceptsArgs: false },
-    { name: 'inference_reset_health', description: 'Re-test an offer and clear its health backoff (not yet implemented)', acceptsArgs: true },
-    { name: 'inference_seller_key', description: 'Create a seller API key (not yet implemented)', acceptsArgs: false },
-  ]
+function formatNumber(n, decimals = 2) {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return '0'
+  return Number(n).toFixed(decimals)
+}
 
-  for (const cmd of sellerCommands) {
-    api.registerCommand({
-      name: cmd.name,
-      description: cmd.description,
-      acceptsArgs: cmd.acceptsArgs,
-      requireAuth: true,
-      handler: notImplemented,
-    })
+function parseArgs(raw) {
+  return (raw || '').trim().split(/\s+/).filter(Boolean)
+}
+
+function formatList(items) {
+  if (!items || items.length === 0) return 'No results.'
+  return items.map((l) => `- ${l}`).join('\n')
+}
+
+function parsePositiveNumber(value, label) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${label} must be a finite positive number.`)
+  }
+  return parsed
+}
+
+// Resolves the offer-creation config: the provider (id -> base URL, restricted
+// to SI-supported providers), the provider API key being resold, and the payout
+// address where USDC earnings settle. The base URL is never typed by the user —
+// it is derived from the chosen provider id so it can't be wrong or off-allowlist.
+function getSellerOfferConfig(ctx) {
+  const providerId = config.getConfigValue(ctx, 'INFERENCE_SELLER_PROVIDER')
+  const providerKey = config.getConfigValue(ctx, 'INFERENCE_SELLER_PROVIDER_API_KEY')
+  const payoutAddress = config.getConfigValue(ctx, 'INFERENCE_SELLER_PAYOUT_ADDRESS')
+
+  const provider = resolveProvider(providerId)
+  if (!provider) {
+    throw new Error(
+      `Set INFERENCE_SELLER_PROVIDER to a supported provider id. Allowed: ${providerIds().join(', ')}.`,
+    )
+  }
+  if (!providerKey) {
+    throw new Error('Missing INFERENCE_SELLER_PROVIDER_API_KEY — the provider API key you are reselling.')
+  }
+  if (!payoutAddress || !/^0x[a-fA-F0-9]{40}$/.test(String(payoutAddress).trim())) {
+    throw new Error('Set INFERENCE_SELLER_PAYOUT_ADDRESS to your wallet (0x…) where USDC earnings settle.')
+  }
+  return { baseUrl: provider.baseUrl, providerKey, payoutAddress: String(payoutAddress).trim() }
+}
+
+async function offers(ctx = {}) {
+  const data = await sellerFetchJson(config.SELLER_OFFERS, {}, ctx)
+  const list = data?.offers || data || []
+  if (!list.length) return { text: 'No offers.' }
+  const rows = list.map((o) => {
+    const id = o.id || o.offer_id || o.offerId
+    const input = formatPrice(Number(o.price_input_per_1m || o.priceInputPer1m || o.input_price))
+    const output = formatPrice(Number(o.price_output_per_1m || o.priceOutputPer1m || o.output_price))
+    // The offers list includes soft-deleted (cancelled) offers, so check active
+    // first — otherwise a cancelled offer would read as "healthy".
+    const state = o.active === false ? 'cancelled' : (o.healthy === false ? 'unhealthy' : 'healthy')
+    const capRemaining = o.cap_daily_remaining_usd ?? o.cap_daily_remaining ?? o.capRemaining ?? o.daily_cap_remaining
+    const capText = capRemaining !== undefined && capRemaining !== null ? `daily cap remaining: ${formatNumber(capRemaining, 2)}` : 'daily cap: n/a'
+    return `${id ? `${id} - ` : ''}${o.model} - ${input} in / ${output} out - ${state} - ${capText}`
+  })
+  return { text: formatList(rows) }
+}
+
+async function sell(ctx = {}) {
+  const [model, inputPrice, outputPrice, dailyCap] = parseArgs(ctx.args)
+  if (!model || !inputPrice || !outputPrice) {
+    return { text: 'Usage: /inference_sell <model> <input_price> <output_price> [daily_cap_usd]' }
+  }
+
+  const { baseUrl, providerKey, payoutAddress } = getSellerOfferConfig(ctx)
+  const body = {
+    model,
+    price_input_per_1m: parsePositiveNumber(inputPrice, 'input_price'),
+    price_output_per_1m: parsePositiveNumber(outputPrice, 'output_price'),
+    api_key: providerKey,
+    seller_base_url: baseUrl,
+    payout_address: payoutAddress,
+  }
+  if (dailyCap !== undefined) {
+    body.cap_daily_usd = parsePositiveNumber(dailyCap, 'daily_cap_usd')
+  }
+
+  const data = await sellerFetchJson(config.SELLER_OFFERS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }, ctx)
+  const offerId = data?.id || data?.offer?.id
+  return { text: `Offer created${offerId ? `: ${offerId}` : '.'}` }
+}
+
+async function price(ctx = {}) {
+  const [offerId, inputPrice, outputPrice] = parseArgs(ctx.args)
+  if (!offerId || !inputPrice || !outputPrice) {
+    return { text: 'Usage: /inference_price <offer_id> <input_price> <output_price>' }
+  }
+  const data = await sellerFetchJson(`${config.SELLER_OFFERS}/${encodeURIComponent(offerId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      price_input_per_1m: parsePositiveNumber(inputPrice, 'input_price'),
+      price_output_per_1m: parsePositiveNumber(outputPrice, 'output_price'),
+    }),
+  }, ctx)
+  return { text: `Offer updated${data?.id ? `: ${data.id}` : '.'}` }
+}
+
+async function cancel(ctx = {}) {
+  const [offerId] = parseArgs(ctx.args)
+  if (!offerId) return { text: 'Usage: /inference_cancel <offer_id>' }
+  await sellerFetchJson(`${config.SELLER_OFFERS}/${encodeURIComponent(offerId)}`, { method: 'DELETE' }, ctx)
+  return { text: `Offer cancelled: ${offerId}` }
+}
+
+async function health(ctx = {}) {
+  const data = await sellerFetchJson(config.SELLER_HEALTH, {}, ctx)
+  const events = data?.health_log || data?.events || data || []
+  if (!events.length) return { text: 'No recent health events.' }
+  const rows = events.slice(0, 10).map((e) => {
+    const ts = e.timestamp ? new Date(e.timestamp).toISOString() : 'unknown time'
+    const detail = e.error_category || e.error || 'event'
+    const status = e.status_code ? `status ${e.status_code}` : ''
+    const action = e.action_taken ? `action ${e.action_taken}` : ''
+    return `${ts} - ${detail} ${status} ${action}`.trim()
+  })
+  return { text: formatList(rows) }
+}
+
+async function earnings(ctx = {}) {
+  const data = await sellerFetchJson(config.SELLER_EARNINGS, {}, ctx)
+  const lines = [
+    `Total earned: ${formatNumber(data?.total_earned_usd ?? 0, 2)} USDC`,
+    `Confirmed earned: ${formatNumber(data?.confirmed_earned_usd ?? 0, 2)} USDC`,
+    `Requests: ${data?.total_requests ?? 0}`,
+    `Tokens: ${data?.total_tokens ?? 0}`,
+  ]
+  const byModel = Array.isArray(data?.by_model) ? data.by_model.slice(0, 5) : []
+  if (byModel.length) {
+    lines.push('Top models:')
+    for (const m of byModel) {
+      lines.push(`  ${m.model} - ${formatNumber(m.earned_usd, 2)} USDC over ${m.requests} req`)
+    }
+  }
+  return { text: formatList(lines) }
+}
+
+async function resetHealth(ctx = {}) {
+  const [offerId] = parseArgs(ctx.args)
+  if (!offerId) return { text: 'Usage: /inference_reset_health <offer_id>' }
+  const data = await sellerFetchJson(`${config.SELLER_OFFERS}/${encodeURIComponent(offerId)}/reset-health`, {
+    method: 'POST',
+  }, ctx)
+  if (data?.ok) {
+    const latency = data.latency_ms !== undefined ? ` (${data.latency_ms}ms)` : ''
+    return { text: `Health check passed${latency}. Offer ${offerId} is now healthy.` }
+  }
+  // The endpoint returns 200 with ok:false and a human-readable suggestion on a
+  // failed probe, so surface the reason rather than a generic success message.
+  const reason = data?.error || 'unknown error'
+  const suggestion = data?.suggestion ? `\n${data.suggestion}` : ''
+  return { text: `Health check failed for ${offerId}: ${reason}${suggestion}` }
+}
+
+async function sellerKey(ctx = {}) {
+  if (config.getConfigValue(ctx, 'INFERENCE_SELLER_API_KEY')) {
+    return { text: 'INFERENCE_SELLER_API_KEY is already set; seller commands will use it. To mint a new key, unset it first.' }
+  }
+  const { apiKey } = await mintSellerKey(ctx)
+  return {
+    text:
+      `Seller API key: ${apiKey}\n` +
+      'Save this key - it will not be shown again. Set INFERENCE_SELLER_API_KEY to reuse it after restart.\n' +
+      'The one-time wallet used to create it was discarded; your USDC earnings settle to INFERENCE_SELLER_PAYOUT_ADDRESS, not to that wallet.\n' +
+      'This key is now part of the conversation context and may be logged; revoke it if this chat is shared.',
   }
 }
 
+function registerSellerCommands(api) {
+  api.registerCommand({
+    name: 'inference_seller_key',
+    description: 'Create a seller API key (generates a one-time wallet, then discards it)',
+    acceptsArgs: false,
+    requireAuth: true,
+    handler: sellerKey,
+  })
+
+  api.registerCommand({
+    name: 'inference_offers',
+    description: 'List your seller offers',
+    acceptsArgs: false,
+    requireAuth: true,
+    handler: offers,
+  })
+
+  api.registerCommand({
+    name: 'inference_sell',
+    description: 'Create a seller offer',
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: sell,
+  })
+
+  api.registerCommand({
+    name: 'inference_price',
+    description: 'Update offer pricing',
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: price,
+  })
+
+  api.registerCommand({
+    name: 'inference_cancel',
+    description: 'Cancel a seller offer',
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: cancel,
+  })
+
+  api.registerCommand({
+    name: 'inference_health',
+    description: 'Show recent health events',
+    acceptsArgs: false,
+    requireAuth: true,
+    handler: health,
+  })
+
+  api.registerCommand({
+    name: 'inference_earnings',
+    description: 'Show seller earnings (settled USDC revenue)',
+    acceptsArgs: false,
+    requireAuth: true,
+    handler: earnings,
+  })
+
+  api.registerCommand({
+    name: 'inference_reset_health',
+    description: 'Re-test an offer and clear its health backoff',
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: resetHealth,
+  })
+}
+
 module.exports = {
-  notImplemented,
+  offers,
+  sell,
+  price,
+  cancel,
+  health,
+  earnings,
+  resetHealth,
+  sellerKey,
   registerSellerCommands,
 }

@@ -4,12 +4,12 @@
 
 # Surplus Intelligence
 
-*A from-chat usage dashboard for your Surplus Intelligence inference account — prices, models, your API key, USDC balance/allowance, and savings.*
+*A from-chat dashboard for your Surplus Intelligence inference account — prices, models, your API key, USDC balance/allowance, savings, and seller offer management.*
 
 [![npm version](https://img.shields.io/npm/v/@prolown/openclaw-surplus-intelligence)](https://www.npmjs.com/package/@prolown/openclaw-surplus-intelligence)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-> **Alpha.** Uses an API key (no wallet). **Seller commands are not yet implemented** — see [Seller](#seller-not-yet-implemented).
+> **Alpha.** Buying uses an API key (no wallet). Selling is supported — `/inference_seller_key` mints a seller key by generating a one-time wallet that is immediately discarded. See [Seller Setup](#seller-setup).
 
 ## What this plugin is
 
@@ -19,6 +19,7 @@
 - Create, list, and revoke your API keys
 - Check your USDC balance, allowance, and savings
 - Get the exact provider config to start buying (`/inference_provider`)
+- Sell: mint a seller key and create / price / cancel offers reselling a supported provider
 
 ## How you actually buy inference
 
@@ -39,7 +40,8 @@ This plugin reads your SI account with your API key and can surface keys into th
 
 - **The key is a secret.** Configure `INFERENCE_API_KEY` as a sensitive value; anyone with it can read your account and spend your approved USDC. It's the same key your client uses as a provider.
 - **Created keys are shown once and become part of the chat transcript.** `/inference_key` returns a new key inline — treat the transcript as sensitive and revoke a key if the chat is shared.
-- The plugin never logs the key, and never echoes it (e.g. `/inference_provider` tells you to use your key, it does not print it). Funding and approving USDC happen in the web dashboard, so no wallet private key ever touches the plugin.
+- The plugin never logs the key, and never echoes it (e.g. `/inference_provider` tells you to use your key, it does not print it). Funding and approving USDC for **buying** happen in the web dashboard, so no wallet private key is involved on the buyer side.
+- **Selling mints a throwaway wallet.** `/inference_seller_key` generates a one-time wallet in memory to sign SI's challenge, then discards it — the private key is never stored, logged, or shown. Your seller key (`si_seller_…`) and provider key are secrets; earnings settle to `INFERENCE_SELLER_PAYOUT_ADDRESS`, not to the throwaway wallet (which holds no funds).
 
 ## Install
 
@@ -100,11 +102,27 @@ Example invocations:
 /inference_key_revoke key_123
 ```
 
-### Seller (not yet implemented)
+### Seller
 
-Seller commands are registered but **not yet implemented** — each returns a notice instead of acting. Selling needs a seller API key (`si_seller_…`), and the Surplus Intelligence dashboard cannot issue one yet. The intended model, once it can, is: a seller key + one or more provider (inference) API keys + a payout address.
+Selling means **reselling a supported provider's inference**: SI routes buyer traffic to that provider with your key, you keep the spread, and earnings settle in USDC to your payout address. See [Seller Setup](#seller-setup).
 
-`/inference_offers`, `/inference_sell`, `/inference_price`, `/inference_cancel`, `/inference_health`, `/inference_earnings`, `/inference_reset_health`, and `/inference_seller_key` currently return a "not yet implemented" message.
+| Command | Description |
+| --- | --- |
+| `/inference_seller_key` | Mint a seller API key (generates a one-time wallet, signs, then discards it; shown once) |
+| `/inference_offers` | List your seller offers with offer IDs |
+| `/inference_sell <model> <input_price> <output_price> [daily_cap_usd]` | Create an offer |
+| `/inference_price <offer_id> <input_price> <output_price>` | Update pricing |
+| `/inference_cancel <offer_id>` | Cancel an offer |
+| `/inference_health` | Show recent health events |
+| `/inference_earnings` | Show seller earnings (settled USDC revenue) |
+| `/inference_reset_health <offer_id>` | Re-test an offer and clear its health backoff |
+
+```text
+/inference_seller_key
+/inference_sell deepseek-ai/DeepSeek-V3 0.30 0.60 50
+/inference_price offer_123 0.28 0.55
+/inference_reset_health offer_123
+```
 
 ## Setup
 
@@ -127,9 +145,33 @@ With the key set, the plugin authenticates the account/usage commands by sending
 
 Your client's calls draw on USDC you've approved to the settlement contract (at least $1.00). `/inference_balance` shows your balance, allowance, and usage; `/inference_approve_status` adds the settlement contract address. **Fund and approve USDC in the web dashboard** at <https://www.surplusintelligence.ai/buy> — it handles both regular wallets and smart-contract wallets. The plugin does not move funds or sign approvals.
 
-## Seller (not yet implemented)
+## Seller Setup
 
-There is currently no way to obtain a seller API key through the Surplus Intelligence web dashboard, and this plugin no longer performs the wallet-signature flow that previously minted one. As a result, seller features are **not implemented** in this release: the seller commands above are registered for discoverability but return a not-implemented notice. Seller support is planned once the dashboard can issue seller keys.
+You sell by **reselling a supported upstream provider** (Venice, OpenRouter, OpenAI, Anthropic, Together, Fireworks, DeepSeek, Mistral, Groq, Z.ai, …). SI proxies buyer requests to that provider using your provider key; you keep the spread, and USDC earnings settle to your payout address. (There's no GUI to mint a seller key yet, so the plugin mints one for you.)
+
+1. **Mint a seller key.** Run `/inference_seller_key`. It generates a one-time wallet, signs SI's challenge, mints an `si_seller_…` key, and **discards the wallet** — the key is shown once. Save it:
+
+   ```bash
+   export INFERENCE_SELLER_API_KEY=si_seller_...
+   ```
+
+   The throwaway wallet holds no funds — earnings go to your payout address (below), not to it.
+
+2. **Configure what you're reselling** (required to create offers):
+
+   ```bash
+   export INFERENCE_SELLER_PROVIDER=venice              # which supported provider
+   export INFERENCE_SELLER_PROVIDER_API_KEY=...          # that provider's API key
+   export INFERENCE_SELLER_PAYOUT_ADDRESS=0xYourWallet   # where USDC earnings settle
+   ```
+
+   `INFERENCE_SELLER_PROVIDER` must be one of: `venice, bankr, openrouter, uncensored, openai, together, fireworks, deepseek, mistral, groq, mordiem, morpheus, zai, zai-coding, jatevo, jatevo-api`. The plugin maps it to the offer's base URL, so you never type (or mistype) a URL — and SI only allows these providers.
+
+3. **Create and manage offers:** `/inference_sell <model> <input_price> <output_price> [daily_cap_usd]` creates an offer from your config (provider → base URL + provider key + payout). Then `/inference_offers`, `/inference_price`, `/inference_cancel`, `/inference_reset_health`, and `/inference_earnings` manage and monitor them.
+
+> `/inference_sell` creates **per-token** offers (input/output pricing, optional daily cap). Extended pricing (cache-read/write, image, reasoning, web-search) and discount/cost-multiplier modes aren't exposed via the command — set those up in the SI web dashboard. Supported providers are mirrored from SI's own list; if SI adds a provider, it can be added to `providers.js`.
+
+> The seller key and your provider key are secrets — they're never logged, and `/inference_seller_key` shows the seller key once (treat the transcript as sensitive). The one-time wallet's private key is never stored or printed.
 
 ## Environment and Config
 
@@ -137,6 +179,10 @@ There is currently no way to obtain a seller API key through the Surplus Intelli
 | --- | --- | --- |
 | `INFERENCE_API_URL` | Surplus Intelligence API base URL. Defaults to `https://www.surplusintelligence.ai`. Must be https; http is allowed only for localhost. | no |
 | `INFERENCE_API_KEY` | Your SI API key (`inf_…`) from the dashboard (SI labels it a "buyer key"). The same key your client uses as a provider; the plugin reads your account/usage with it. | yes |
+| `INFERENCE_SELLER_API_KEY` | Seller API key (`si_seller_…`) from `/inference_seller_key`. Authorizes seller commands. | yes |
+| `INFERENCE_SELLER_PROVIDER` | Which supported provider you resell from; the plugin maps it to the offer's base URL. | no |
+| `INFERENCE_SELLER_PROVIDER_API_KEY` | The provider key you're reselling (SI proxies buyer traffic to that provider with it). | yes |
+| `INFERENCE_SELLER_PAYOUT_ADDRESS` | Your wallet (`0x…`) where USDC earnings settle. | no |
 
 Values set in the plugin config take precedence over environment variables of the same name.
 

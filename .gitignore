@@ -20,6 +20,9 @@ coverage/
 *.tsbuildinfo
 .cache/
 
+# Local test lib — gitignored for now (not part of the published package)
+/test/
+
 # Environment & secrets (never commit — this repo is public)
 .env
 .env.*

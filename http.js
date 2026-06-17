@@ -1,5 +1,5 @@
 const config = require('./config')
-const { getAccountAuth } = require('./auth')
+const { getAccountAuth, getSellerAuth } = require('./auth')
 const { errorDetailFromResponse } = require('./errors')
 
 function toUrl(pathOrUrl, ctx = {}) {
@@ -33,7 +33,17 @@ async function accountFetchJson(path, options = {}, ctx = {}) {
   return fetchJson(path, { ...options, headers }, ctx)
 }
 
+async function sellerFetchJson(path, options = {}, ctx = {}) {
+  const { apiKey } = await getSellerAuth(ctx)
+  const headers = {
+    ...(options.headers || {}),
+    Authorization: `Bearer ${apiKey}`,
+  }
+  return fetchJson(path, { ...options, headers }, ctx)
+}
+
 module.exports = {
   fetchJson,
   accountFetchJson,
+  sellerFetchJson,
 }
