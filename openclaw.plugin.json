@@ -1,8 +1,8 @@
 {
   "id": "openclaw-surplus-intelligence",
   "name": "Surplus Intelligence",
-  "version": "0.3.0-alpha.1",
-  "description": "A from-chat dashboard for your Surplus Intelligence inference account: prices, models, your API key, USDC balance/allowance, and savings (no wallet needed to buy). You buy inference by using your key as an OpenAI-compatible provider at <base>/api/inference/v1 in your own client — run /inference_provider for the setup. Also manages the seller side: create a seller key and list/price/cancel offers (you resell a supported provider's inference; earnings settle in USDC to your payout address).",
+  "version": "0.4.0-alpha.1",
+  "description": "A from-chat dashboard for your Surplus Intelligence inference account: prices, models, your API key, USDC balance/allowance, and savings (no wallet needed to buy). You buy inference by using your key as an OpenAI-compatible provider at <base>/api/inference/v1 in your own client — run /inference_provider for the setup. Also manages the seller side: mint/list/revoke seller keys and create/price/pause/cancel offers (per-token or discount pricing), probe your provider, discover sellable models, and track earnings (you resell a supported provider's inference; earnings settle in USDC to your payout address).",
   "license": "MIT",
   "author": "ProlowN <robin334@protonmail.com>",
   "repository": {
@@ -12,7 +12,7 @@
   "homepage": "https://github.com/ProlowN/openclaw-plugin-surplus-intelligence#readme",
   "entryPoint": "./index.js",
   "setupHints": [
-    "Set INFERENCE_API_URL to the Surplus Intelligence API host you intend to use (https required, http only for localhost). Defaults to https://www.surplusintelligence.ai.",
+    "Set INFERENCE_API_URL to the Surplus Intelligence API host you intend to use (https required, http only for localhost). Defaults to https://www.surplusintelligence.ai. Seller commands talk to SI's v1 API origin (derived automatically; override with INFERENCE_API_ORIGIN for self-hosted setups).",
     "Browsing the market (/inference_prices, /inference_models) needs no credentials.",
     "BUYING: create an inf_ key in the dashboard (https://www.surplusintelligence.ai/buy), add USDC to your wallet, approve spend there, and set the key as INFERENCE_API_KEY. To actually buy, use that key as an OpenAI-compatible provider at <INFERENCE_API_URL>/api/inference/v1 in your client — run /inference_provider for the setup. This plugin does not send inference itself.",
     "SELLING: run /inference_seller_key once to mint a seller key (it generates a one-time wallet, signs, then discards it), and set the result as INFERENCE_SELLER_API_KEY. Creating offers also needs INFERENCE_SELLER_PROVIDER (which supported provider you resell), INFERENCE_SELLER_PROVIDER_API_KEY (that provider's key), and INFERENCE_SELLER_PAYOUT_ADDRESS (your wallet for USDC earnings).",
@@ -27,6 +27,11 @@
         "format": "uri",
         "default": "https://www.surplusintelligence.ai",
         "description": "Surplus Intelligence API base URL."
+      },
+      "INFERENCE_API_ORIGIN": {
+        "type": "string",
+        "format": "uri",
+        "description": "Surplus Intelligence v1 API origin used by the seller commands. Usually leave unset: SI hosts map to https://api.surplusintelligence.ai automatically, and any other INFERENCE_API_URL serves both. Set it only for split-host self-hosted deployments."
       },
       "INFERENCE_API_KEY": {
         "type": "string",

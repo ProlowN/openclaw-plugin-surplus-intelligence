@@ -19,7 +19,7 @@
 - Create, list, and revoke your API keys
 - Check your USDC balance, allowance, and savings
 - Get the exact provider config to start buying (`/inference_provider`)
-- Sell: mint a seller key and create / price / cancel offers reselling a supported provider
+- Sell: mint/manage seller keys, discover sellable models, probe your provider, create offers (per-token or at a discount, one or in bulk), re-price/pause/resume/cancel them in place, and track earnings
 
 ## How you actually buy inference
 
@@ -108,20 +108,30 @@ Selling means **reselling a supported provider's inference**: SI routes buyer tr
 
 | Command | Description |
 | --- | --- |
-| `/inference_seller_key` | Mint a seller API key (generates a one-time wallet, signs, then discards it; shown once) |
-| `/inference_offers` | List your seller offers with offer IDs |
-| `/inference_sell <model> <input_price> <output_price> [daily_cap_usd]` | Create an offer |
-| `/inference_price <offer_id> <input_price> <output_price>` | Update pricing |
-| `/inference_cancel <offer_id>` | Cancel an offer |
-| `/inference_health` | Show recent health events |
-| `/inference_earnings` | Show seller earnings (settled USDC revenue) |
-| `/inference_reset_health <offer_id>` | Re-test an offer and clear its health backoff |
+| `/inference_seller_key` | Create a seller API key (first key: one-time wallet, discarded; later keys: minted with your existing key, no wallet) |
+| `/inference_seller_keys` | List your seller API keys |
+| `/inference_seller_key_revoke <key_id>` | Revoke a seller API key |
+| `/inference_offers [active\|inactive]` | List your seller offers with offer IDs (paused offers are stored as inactive) |
+| `/inference_sell <model> <input> <output> [daily_cap_usd]` | Create a per-token offer (USD per 1M tokens) |
+| `/inference_sell <model> <discount>% [daily_cap_usd]` | Create a discount offer (e.g. `15%` under the reference price) |
+| `/inference_sell_bulk <discount>% <model> [model2 …]` | Create discount offers for many models at once |
+| `/inference_price <offer_id> <input> <output>` (or `<discount>%`) | Update pricing in place — no cancel/re-create needed |
+| `/inference_pause <offer_id>` / `/inference_resume <offer_id>` | Take an offer out of routing and bring it back |
+| `/inference_cancel <offer_id>` | Cancel an offer (soft-deactivates; `/inference_resume` relists it) |
+| `/inference_test <model> [model2 …]` | Probe your provider end-to-end (one model, or a batch) |
+| `/inference_discover` | List which of your provider's models are sellable on the marketplace |
+| `/inference_health [offer_id]` | Show recent health events (optionally for one offer) |
+| `/inference_earnings [7d\|30d\|90d\|lifetime]` | Show seller earnings: lifetime/pending/paid, top models, recent sales |
+| `/inference_reset_health <offer_id>` | Clear an offer's health backoff so it is probed again |
 
 ```text
 /inference_seller_key
+/inference_discover
 /inference_sell deepseek-ai/DeepSeek-V3 0.30 0.60 50
-/inference_price offer_123 0.28 0.55
-/inference_reset_health offer_123
+/inference_sell_bulk 15% deepseek-ai/DeepSeek-V3 meta-llama/Llama-3.3-70B
+/inference_price offer_123 20%
+/inference_pause offer_123
+/inference_earnings 30d
 ```
 
 ## Setup
@@ -147,15 +157,15 @@ Your client's calls draw on USDC you've approved to the settlement contract (at 
 
 ## Seller Setup
 
-You sell by **reselling a supported upstream provider** (Venice, OpenRouter, OpenAI, Anthropic, Together, Fireworks, DeepSeek, Mistral, Groq, Z.ai, …). SI proxies buyer requests to that provider using your provider key; you keep the spread, and USDC earnings settle to your payout address. (There's no GUI to mint a seller key yet, so the plugin mints one for you.)
+You sell by **reselling a supported upstream provider** (Venice, OpenRouter, OpenAI, Anthropic, Together, Fireworks, DeepSeek, Mistral, Groq, Z.ai, …). SI proxies buyer requests to that provider using your provider key; you keep the spread, and USDC earnings settle to your payout address.
 
-1. **Mint a seller key.** Run `/inference_seller_key`. It generates a one-time wallet, signs SI's challenge, mints an `si_seller_…` key, and **discards the wallet** — the key is shown once. Save it:
+1. **Mint a seller key.** Run `/inference_seller_key`. Your **first** key is minted by generating a one-time wallet, signing SI's challenge, and **discarding the wallet** — the key is shown once. Save it:
 
    ```bash
    export INFERENCE_SELLER_API_KEY=si_seller_...
    ```
 
-   The throwaway wallet holds no funds — earnings go to your payout address (below), not to it.
+   The throwaway wallet holds no funds — earnings go to your payout address (below), not to it. Once a key is set, running `/inference_seller_key` again mints **additional** keys through the API with no wallet involved; `/inference_seller_keys` and `/inference_seller_key_revoke` manage them.
 
 2. **Configure what you're reselling** (required to create offers):
 
@@ -167,17 +177,20 @@ You sell by **reselling a supported upstream provider** (Venice, OpenRouter, Ope
 
    `INFERENCE_SELLER_PROVIDER` must be one of: `venice, bankr, openrouter, uncensored, openai, together, fireworks, deepseek, mistral, groq, mordiem, morpheus, zai, zai-coding, jatevo, jatevo-api`. The plugin maps it to the offer's base URL, so you never type (or mistype) a URL — and SI only allows these providers.
 
-3. **Create and manage offers:** `/inference_sell <model> <input_price> <output_price> [daily_cap_usd]` creates an offer from your config (provider → base URL + provider key + payout). Then `/inference_offers`, `/inference_price`, `/inference_cancel`, `/inference_reset_health`, and `/inference_earnings` manage and monitor them.
+3. **Find what to sell:** `/inference_discover` lists which of your provider's models are sellable on the marketplace (with their direct reference prices), and `/inference_test <model>` probes your provider end-to-end before you list.
 
-> `/inference_sell` creates **per-token** offers (input/output pricing, optional daily cap). Extended pricing (cache-read/write, image, reasoning, web-search) and discount/cost-multiplier modes aren't exposed via the command — set those up in the SI web dashboard. Supported providers are mirrored from SI's own list; if SI adds a provider, it can be added to `providers.js`.
+4. **Create and manage offers:** `/inference_sell` creates one offer — per-token (`<model> 0.30 0.60`) or at a discount under the marketplace reference price (`<model> 15%`) — and `/inference_sell_bulk 15% <models…>` lists many models at once. Then `/inference_offers`, `/inference_price` (re-price in place, per-token or discount), `/inference_pause`/`/inference_resume`, `/inference_cancel`, `/inference_reset_health`, `/inference_health`, and `/inference_earnings` manage and monitor them.
 
-> The seller key and your provider key are secrets — they're never logged, and `/inference_seller_key` shows the seller key once (treat the transcript as sensitive). The one-time wallet's private key is never stored or printed.
+> Offers may not be priced above **2× the marketplace reference price** — creation, re-pricing, and resuming all enforce it. An offer's `model`, provider key, and base URL are fixed after creation (cancel and re-create to change those); price, mode, cap, payout address, and status update in place. Extended pricing (cache-read/write, image, reasoning, web-search) isn't exposed via the commands — set those up in the SI web dashboard. Supported providers are mirrored from SI's own list; if SI adds a provider, it can be added to `providers.js`.
+
+> The seller key and your provider key are secrets — they're never logged, and `/inference_seller_key` shows a new key once (treat the transcript as sensitive). The one-time wallet's private key is never stored or printed.
 
 ## Environment and Config
 
 | Name | Purpose | Sensitive |
 | --- | --- | --- |
 | `INFERENCE_API_URL` | Surplus Intelligence API base URL. Defaults to `https://www.surplusintelligence.ai`. Must be https; http is allowed only for localhost. | no |
+| `INFERENCE_API_ORIGIN` | SI's v1 API origin used by the seller commands. Usually leave unset: SI hosts map to `https://api.surplusintelligence.ai` automatically, and any other `INFERENCE_API_URL` serves both. Only needed for split-host self-hosted deployments. | no |
 | `INFERENCE_API_KEY` | Your SI API key (`inf_…`) from the dashboard (SI labels it a "buyer key"). The same key your client uses as a provider; the plugin reads your account/usage with it. | yes |
 | `INFERENCE_SELLER_API_KEY` | Seller API key (`si_seller_…`) from `/inference_seller_key`. Authorizes seller commands. | yes |
 | `INFERENCE_SELLER_PROVIDER` | Which supported provider you resell from; the plugin maps it to the offer's base URL. | no |
